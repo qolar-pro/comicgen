@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ComicGen Studio</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <main class="container">
+      <h1>ComicGen Studio</h1>
+      <p>Create reusable characters from photos, then generate a comic page + soundtrack brief.</p>
+
+      <section class="card">
+        <h2>1) Add Character from Photo</h2>
+        <form id="characterForm">
+          <input type="file" name="image" accept="image/*" required />
+          <input type="text" name="name" placeholder="Optional character name" />
+          <textarea name="hint" placeholder="Optional style hint"></textarea>
+          <button type="submit">Save Character</button>
+        </form>
+      </section>
+
+      <section class="card">
+        <h2>2) Story Setup</h2>
+        <label>Location</label>
+        <textarea id="location" placeholder="Where does the scene happen?"></textarea>
+        <label>Event</label>
+        <textarea id="event" placeholder="What is happening?"></textarea>
+        <label>Bad Guy Description</label>
+        <textarea id="villain" placeholder="Describe the villain"></textarea>
+      </section>
+
+      <section class="card">
+        <h2>3) Choose Characters</h2>
+        <div id="characterList" class="grid"></div>
+      </section>
+
+      <section class="card">
+        <h2>4) Generate</h2>
+        <button id="generateBtn">Generate Comic Page + Music Track Brief</button>
+        <pre id="output"></pre>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
