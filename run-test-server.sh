@@ -376,6 +376,14 @@ else
 fi
 printf '%s' "$FRESH" | grep -E '(Red|Blue|Green|Yellow|Aqua): .* wool' | tail -5 | sed 's/^/          /'
 
+# The square arena's corner (61,61) sits outside a circle of radius 80, so the
+# rebuild has to clear it - otherwise the old arena's edges are left floating
+# beyond the new glass shell.
+check_block switched/old-corner-cleared 61 64 61 minecraft:air
+check_block switched/new-platform-built 70  64  0 minecraft:grass_block
+sleep 4
+assert_checks
+
 step "Stopping the server"
 console "stop"
 wait_for 'Stopping server' 60 || true

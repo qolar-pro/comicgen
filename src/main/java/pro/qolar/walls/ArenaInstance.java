@@ -26,6 +26,8 @@ public final class ArenaInstance {
     private ModeSettings mode;
     private Arena arena;
     private GameManager game;
+    /** Extent of the arena previously built in this world, if any. */
+    private int previousReach;
 
     public ArenaInstance(WallsPlugin plugin, WallsConfig config, String name, ModeSettings mode) {
         this.plugin = plugin;
@@ -44,7 +46,7 @@ public final class ArenaInstance {
         ArenaGeometry geometry = config.geometryFor(mode);
         int baseOffset = config.baseOffsetFor(mode, geometry, plugin.getLogger());
         SectorLayout layout = SectorLayout.forGeometry(geometry, baseOffset);
-        arena = new Arena(plugin, config, worldName, geometry, layout);
+        arena = new Arena(plugin, config, worldName, geometry, layout, previousReach);
         game = new GameManager(plugin, config, arena, mode);
     }
 
@@ -85,6 +87,9 @@ public final class ArenaInstance {
         }
         game.shutdown();
         arena.shutdown();
+        // Remember this arena's extent so the next one clears whatever it leaves
+        // sticking out beyond its own glass shell.
+        previousReach = arena.reach();
         this.mode = newMode;
         assemble();
         return null;

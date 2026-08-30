@@ -35,6 +35,7 @@ public final class Arena {
     private final ArenaGeometry geo;
     private final SectorLayout layout;
     private final ColumnMap columns;
+    private final int clearReach;
     private final Random random = new Random();
 
     private World world;
@@ -44,14 +45,27 @@ public final class Arena {
     private boolean wallsUp;
     private boolean built;
 
+    /**
+     * @param clearReach how far a previously built arena extended in this world.
+     *                   Switching to a smaller or differently shaped arena would
+     *                   otherwise leave the old one's edges floating outside the
+     *                   new glass shell, so that footprint is cleared on the next
+     *                   rebuild. Zero for a world with no arena in it yet.
+     */
     public Arena(Plugin plugin, WallsConfig config, String worldName,
-                 ArenaGeometry geometry, SectorLayout layout) {
+                 ArenaGeometry geometry, SectorLayout layout, int clearReach) {
         this.plugin = plugin;
         this.config = config;
         this.worldName = worldName;
         this.geo = geometry;
         this.layout = layout;
         this.columns = ColumnMap.of(geometry);
+        this.clearReach = clearReach;
+    }
+
+    /** How far this arena extends from the centre, for a later rebuild to clear. */
+    public int reach() {
+        return columns.reach();
     }
 
     public String worldName() {
@@ -140,11 +154,6 @@ public final class Arena {
         return z - config.centerZ();
     }
 
-    /** Centre of the loot vault, standing on its floor. */
-    public Location vaultCentre() {
-        return new Location(world, worldX(0) + 0.5, geo.floorY() + 1.0, worldZ(0) + 0.5);
-    }
-
     /** Where a team spawns: a few blocks in front of its objective, facing the centre. */
     public Location baseSpawn(int teamIndex) {
         Sector sector = layout.get(teamIndex);
@@ -158,15 +167,6 @@ public final class Arena {
     public Location objectiveLocation(int teamIndex) {
         Sector sector = layout.get(teamIndex);
         return new Location(world, worldX(sector.baseDx()), geo.floorY() + 2.0, worldZ(sector.baseDz()));
-    }
-
-    public boolean isInArena(Location location) {
-        if (world == null || location.getWorld() == null
-                || !location.getWorld().getName().equals(world.getName())) {
-            return false;
-        }
-        return columns.at(localX(location.getBlockX()), localZ(location.getBlockZ()))
-                != ColumnMap.Column.OUTSIDE;
     }
 
     // --- protection ------------------------------------------------------
@@ -266,7 +266,8 @@ public final class Arena {
 
     /** The whole arena as one volume - platform, glass, walls, and air everywhere else. */
     private ArenaBuilder.BlockVolume fullVolume() {
-        int reach = columns.reach();
+        // Span whichever is wider: this arena, or the one that stood here before.
+        int reach = Math.max(columns.reach(), clearReach);
         return new ArenaBuilder.BlockVolume() {
             @Override
             public int minX() {
@@ -309,7 +310,10 @@ public final class Arena {
     private Material blockFor(int dx, int y, int dz) {
         switch (columns.at(dx, dz)) {
             case OUTSIDE:
-                return null;
+                // Outside this arena but inside a previous one's footprint: clear
+                // it. Anywhere else is somebody's world and is left untouched.
+                boolean leftoverFromOlderArena = Math.max(Math.abs(dx), Math.abs(dz)) <= clearReach;
+                return leftoverFromOlderArena && y < geo.ceilingY() ? Material.AIR : null;
             case GLASS:
                 return config.glassMaterial();
             case WALL:

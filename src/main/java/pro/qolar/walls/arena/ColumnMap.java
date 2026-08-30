@@ -78,15 +78,4 @@ public final class ColumnMap {
     public int reach() {
         return reach;
     }
-
-    /** Count of columns of a given kind - handy for tests and diagnostics. */
-    public int count(Column kind) {
-        int total = 0;
-        for (byte cell : cells) {
-            if (VALUES[cell] == kind) {
-                total++;
-            }
-        }
-        return total;
-    }
 }
