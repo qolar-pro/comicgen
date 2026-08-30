@@ -165,9 +165,9 @@ components — each of those changed incompatibly somewhere in that version rang
 ```
 
 `--smoke` boots Paper, builds the arena from nothing, and then asks the server what is actually at
-26 specific coordinates — before and after the walls drop, above ground and below — so a wrongly
+24 specific coordinates — before and after the walls drop, above ground and below — so a wrongly
 shaped arena fails loudly instead of looking fine. It then switches to the five-team circular mode
-live, rebuilds, and checks both that the new arena exists and that the old one's corners were
+live, rebuilds, and checks two more: that the new arena exists, and that the old one's corners were
 cleared away.
 
 `--match` goes further. It connects real clients with [mineflayer](https://github.com/PrismarineJS/mineflayer)
