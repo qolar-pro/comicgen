@@ -380,7 +380,7 @@ printf '%s' "$FRESH" | grep -E '(Red|Blue|Green|Yellow|Aqua): .* wool' | tail -5
 # rebuild has to clear it - otherwise the old arena's edges are left floating
 # beyond the new glass shell.
 check_block switched/old-corner-cleared 61 64 61 minecraft:air
-check_block switched/new-platform-built 70  64  0 minecraft:grass_block
+check_block switched/new-platform-built 49 64 35 minecraft:grass_block
 sleep 4
 assert_checks
 

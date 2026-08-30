@@ -313,7 +313,9 @@ public final class Arena {
                 // Outside this arena but inside a previous one's footprint: clear
                 // it. Anywhere else is somebody's world and is left untouched.
                 boolean leftoverFromOlderArena = Math.max(Math.abs(dx), Math.abs(dz)) <= clearReach;
-                return leftoverFromOlderArena && y < geo.ceilingY() ? Material.AIR : null;
+                // The whole column, ceiling included - the old arena's glass roof
+                // extended over ground the new one does not cover.
+                return leftoverFromOlderArena ? Material.AIR : null;
             case GLASS:
                 return config.glassMaterial();
             case WALL:

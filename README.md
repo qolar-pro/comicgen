@@ -165,14 +165,16 @@ components — each of those changed incompatibly somewhere in that version rang
 ```
 
 `--smoke` boots Paper, builds the arena from nothing, and then asks the server what is actually at
-two dozen specific coordinates — before and after the walls drop, above ground and below — so a
-wrongly shaped arena fails loudly instead of looking fine.
+26 specific coordinates — before and after the walls drop, above ground and below — so a wrongly
+shaped arena fails loudly instead of looking fine. It then switches to the five-team circular mode
+live, rebuilds, and checks both that the new arena exists and that the old one's corners were
+cleared away.
 
 `--match` goes further. It connects real clients with [mineflayer](https://github.com/PrismarineJS/mineflayer)
-and drives the server over RCON, covering what no unit test can: teams are assigned, the walls come
-down, a player dies and respawns while their wool stands, a player breaks the wool, that same player
-dies again and is out for good, and the last team standing ends the match. Run `npm install` in
-`tools/` first.
+and drives the server over RCON, covering what no unit test can: two arenas are registered in
+separate worlds, teams are assigned, the walls come down, a player dies and respawns while their
+wool stands, a player breaks the wool, that same player dies again and is out for good, and the
+last team standing ends the match. Run `npm install` in `tools/` first.
 
 Both are verified passing on **Paper 1.20.6** and **Paper 1.21.4** from the same jar.
 
