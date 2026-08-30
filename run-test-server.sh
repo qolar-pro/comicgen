@@ -222,13 +222,21 @@ cleanup() {
 }
 trap cleanup EXIT
 
-console() { printf '%s\n' "$1" >&3; }
+# Console output already written when the last command was sent. wait_for
+# searches only past this point, so a matching line from an *earlier* command
+# cannot satisfy a later wait - which would silently make the wait a no-op.
+LAST_MARK=1
 
-# Wait for a pattern to appear in the server output.
+console() {
+  LAST_MARK=$(( $(wc -l < "$RUN_DIR/console.out" 2>/dev/null || echo 0) + 1 ))
+  printf '%s\n' "$1" >&3
+}
+
+# Wait for a pattern in the output produced since the last console command.
 wait_for() {
   local pattern="$1" timeout="${2:-240}" waited=0
   while [ "$waited" -lt "$timeout" ]; do
-    if grep -qF "$pattern" "$RUN_DIR/console.out" 2>/dev/null; then
+    if tail -n "+$LAST_MARK" "$RUN_DIR/console.out" 2>/dev/null | grep -qF "$pattern"; then
       return 0
     fi
     if ! kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -360,13 +368,13 @@ console "walls reset"
 wait_for 'Arena ready' 300 || die "the circular 5-team arena never finished building"
 console "walls status"; sleep 3
 
-if sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" | grep -qE '^\[.*Aqua: .* wool '; then
+FRESH=$(tail -n "+$LAST_MARK" "$RUN_DIR/console.out" | sed -e 's/\x1b\[[0-9;]*m//g')
+if printf '%s' "$FRESH" | grep -qE 'Aqua: .* wool '; then
   echo "    ok    a fifth team exists with its own colour"
 else
   die "the 5-team mode did not produce five distinct teams"
 fi
-sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" | tail -40 \
-  | grep -E '(Red|Blue|Green|Yellow|Aqua): .* wool' | tail -5 | sed 's/^/          /'
+printf '%s' "$FRESH" | grep -E '(Red|Blue|Green|Yellow|Aqua): .* wool' | tail -5 | sed 's/^/          /'
 
 step "Stopping the server"
 console "stop"

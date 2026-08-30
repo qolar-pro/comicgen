@@ -32,7 +32,7 @@ arena:
 walls:
   material: SANDSTONE
 
-  # Width of each of the four arms. Must be an odd number so it has a centre.
+  # Width of each wall arm. Must be an odd number so it has a centre.
   thickness: 3
 
   # Walls run the full depth of the platform as well as standing above it, so
