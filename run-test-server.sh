@@ -145,6 +145,15 @@ modes:
     vault-radius: 6
     base-offset: 15
     grace-seconds: 20
+  duel:
+    teams: 2
+    shape: CIRCLE
+    radius: 25
+    players-per-team: 1
+    wall-height: 12
+    vault-radius: 6
+    base-offset: 15
+    grace-seconds: 20
 default-mode: test
 arenas:
   main:

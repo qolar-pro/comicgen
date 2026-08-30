@@ -193,6 +193,8 @@ async function main() {
     'both arenas are registered');
   check(/world/.test(arenaList) && /walls_second/.test(arenaList),
     'each arena has its own world');
+  check(/mode test/.test(arenaList) && /mode duel/.test(arenaList),
+    'the two arenas run different modes');
   arenaList.trim().split('\n').forEach((line) => log(line.trim()));
 
   step('Building the arena');
