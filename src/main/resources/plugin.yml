@@ -1,0 +1,19 @@
+name: Walls
+version: '${project.version}'
+main: pro.qolar.walls.WallsPlugin
+api-version: '1.20'
+description: The Walls minigame - four teams, four walls, one loot vault.
+author: qolar
+folia-supported: false
+
+commands:
+  walls:
+    description: Walls minigame administration.
+    usage: /walls <reset|start|up|down|stop|status|join|tp>
+    aliases: [w]
+    permission: walls.admin
+
+permissions:
+  walls.admin:
+    description: Administer the Walls minigame.
+    default: op

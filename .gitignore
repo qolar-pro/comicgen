@@ -1,4 +1,18 @@
-__pycache__/
-*.pyc
-.venv/
-.env
+# Build output
+target/
+*.class
+*.jar
+
+# Local test server (created by run-test-server.sh)
+run/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.settings/
+.classpath
+.project
+
+# OS
+.DS_Store
