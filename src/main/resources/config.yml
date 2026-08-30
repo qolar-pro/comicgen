@@ -1,0 +1,85 @@
+# Walls - configuration
+#
+# The arena is rebuilt from these values by /walls reset, so changing a number
+# here and rebuilding is all it takes to reshape the map.
+
+arena:
+  # A dedicated world is created automatically. It is generated empty; the
+  # platform below is painted into it.
+  world: walls_arena
+  center-x: 0
+  center-z: 0
+
+  # Half-width of the playing surface. The arena is (2 * radius + 1) blocks
+  # across, so 60 gives a 121x121 map. Raise it for 100-player games; lower it
+  # for quick small ones.
+  radius: 60
+
+  # Y of the grass surface everyone plays on.
+  floor-y: 64
+
+  # How deep the platform is, in blocks. Laid out top-down as
+  # 1 grass, 4 dirt, then stone, then 1 bedrock - so most of this depth is solid
+  # stone, which is where caves and ore can be carved in later.
+  thickness: 50
+
+  # Distance from the centre to each team's base. 0 = choose automatically.
+  base-offset: 0
+
+  # Block changes per tick while building. Higher rebuilds faster but costs more
+  # per tick; the default keeps a full rebuild at a couple of seconds with no
+  # visible lag.
+  blocks-per-tick: 20000
+
+  glass:
+    # Height of the glass shell above the floor. Must be greater than the wall
+    # height, or the walls could be climbed out of.
+    height: 40
+    material: GLASS
+
+walls:
+  material: SANDSTONE
+
+  # Width of each of the four arms. Must be an odd number so it has a centre.
+  thickness: 3
+
+  # How far the walls stand above the floor.
+  height: 14
+
+  # Half-width of the sealed loot vault at the centre. Its interior stays open
+  # so the chests inside survive the walls coming down.
+  vault-radius: 6
+
+  # How long the walls take to rise or fall, in ticks (20 ticks = 1 second).
+  fall-ticks: 40
+
+bases:
+  pedestal-material: STONE_BRICKS
+
+center:
+  # Loot chests inside the vault.
+  chests: 8
+  # Distance from the centre the chests are arranged at. Must be less than
+  # walls.vault-radius.
+  ring-radius: 3
+
+teams:
+  # Only 4 is supported in this version - the square is split into quadrants.
+  # Radial layouts for 5+ teams are not implemented yet.
+  count: 4
+  min-players-per-team: 1
+
+objective:
+  # The "1000 health" wool block each team must defend.
+  max-health: 1000
+  # Health removed per break attempt. 1000 / 50 = 20 breaks to destroy.
+  damage-per-break: 50
+
+game:
+  countdown-seconds: 15
+  # How long teams have behind the walls before they fall.
+  grace-seconds: 180
+  # Time spent as a spectator before respawning, while the team's wool stands.
+  respawn-seconds: 5
+  # How long the winner is shown before the arena rebuilds.
+  end-seconds: 10
