@@ -62,7 +62,7 @@ public final class WallsConfig {
 
     private final Map<String, ModeSettings> modes;
     private final String defaultMode;
-    private final Map<String, String> arenas;
+    private final Map<String, ArenaDefinition> arenas;
 
     public WallsConfig(FileConfiguration config, Logger log) {
         this.worldPrefix = config.getString("arena.world", "walls_arena");
@@ -139,9 +139,14 @@ public final class WallsConfig {
         return first;
     }
 
-    private static Map<String, String> readArenas(FileConfiguration config, Map<String, ModeSettings> modes,
-                                                  String defaultMode, Logger log) {
-        Map<String, String> found = new LinkedHashMap<>();
+    /** One configured arena: which mode it starts on, and which world it occupies. */
+    public record ArenaDefinition(String mode, String world) {
+    }
+
+    private static Map<String, ArenaDefinition> readArenas(FileConfiguration config,
+                                                           Map<String, ModeSettings> modes,
+                                                           String defaultMode, Logger log) {
+        Map<String, ArenaDefinition> found = new LinkedHashMap<>();
         ConfigurationSection section = config.getConfigurationSection("arenas");
         if (section != null) {
             for (String key : section.getKeys(false)) {
@@ -152,11 +157,26 @@ public final class WallsConfig {
                             + "'; using '" + defaultMode + "'");
                     mode = defaultMode;
                 }
-                found.put(name, mode.toLowerCase(Locale.ROOT));
+                found.put(name, new ArenaDefinition(mode.toLowerCase(Locale.ROOT),
+                        section.getString(key + ".world")));
             }
         }
         if (found.isEmpty()) {
-            found.put("main", defaultMode);
+            found.put("main", new ArenaDefinition(defaultMode, null));
+        }
+
+        // Two arenas sharing a world would fight over the same blocks.
+        Map<String, String> claimed = new LinkedHashMap<>();
+        for (Map.Entry<String, ArenaDefinition> entry : found.entrySet()) {
+            String world = entry.getValue().world();
+            if (world == null) {
+                continue;
+            }
+            String owner = claimed.putIfAbsent(world, entry.getKey());
+            if (owner != null) {
+                throw new IllegalArgumentException("arenas '" + owner + "' and '" + entry.getKey()
+                        + "' both claim world '" + world + "'; each arena needs its own");
+            }
         }
         return Collections.unmodifiableMap(found);
     }
@@ -205,9 +225,16 @@ public final class WallsConfig {
         return configured;
     }
 
-    /** The world a named arena lives in. */
+    /**
+     * The world a named arena lives in: its own {@code world:} setting if it has
+     * one, otherwise derived from the prefix. A single arena keeps the plain
+     * prefix, so existing single-arena setups are undisturbed.
+     */
     public String worldNameFor(String arenaName) {
-        // A single arena keeps the plain world name, so existing setups are undisturbed.
+        ArenaDefinition definition = arenas.get(arenaName.toLowerCase(Locale.ROOT));
+        if (definition != null && definition.world() != null && !definition.world().isBlank()) {
+            return definition.world();
+        }
         return arenas.size() == 1 ? worldPrefix : worldPrefix + "_" + arenaName;
     }
 
@@ -225,7 +252,7 @@ public final class WallsConfig {
         return defaultMode;
     }
 
-    public Map<String, String> arenas() {
+    public Map<String, ArenaDefinition> arenas() {
         return arenas;
     }
 

@@ -171,6 +171,21 @@ public final class StatsStore {
         return records.get(id);
     }
 
+    /**
+     * Find a record by name.
+     *
+     * <p>By stored name rather than by resolving the name to a UUID: that
+     * resolution can block on a web request for a name nobody here has seen.
+     */
+    public Record byName(String name) {
+        for (Record record : records.values()) {
+            if (record.name.equalsIgnoreCase(name)) {
+                return record;
+            }
+        }
+        return null;
+    }
+
     public boolean enabled() {
         return enabled;
     }

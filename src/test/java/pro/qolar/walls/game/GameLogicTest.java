@@ -2,6 +2,7 @@ package pro.qolar.walls.game;
 
 import org.junit.jupiter.api.Test;
 
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -191,6 +192,21 @@ class GameLogicTest {
     }
 
     // --- misc -------------------------------------------------------------
+
+    /** Two teams sharing a colour would make it impossible to tell wools apart. */
+    @Test
+    void everyTeamColourIsDistinct() {
+        Set<String> names = new java.util.HashSet<>();
+        Set<org.bukkit.ChatColor> chat = new java.util.HashSet<>();
+        Set<org.bukkit.Material> wools = new java.util.HashSet<>();
+        for (TeamColor colour : TeamColor.values()) {
+            assertTrue(names.add(colour.displayName()), "duplicate name " + colour.displayName());
+            assertTrue(chat.add(colour.chatColor()), "duplicate chat colour for " + colour);
+            assertTrue(wools.add(colour.wool()), "duplicate wool for " + colour);
+        }
+        assertEquals(TeamColor.MAX_TEAMS, TeamColor.values().length,
+                "MAX_TEAMS must match the colours actually defined");
+    }
 
     @Test
     void timerFormatting() {

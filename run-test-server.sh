@@ -103,10 +103,8 @@ arena:
   world: world
   center-x: 0
   center-z: 0
-  radius: 25
   floor-y: 64
   thickness: 50
-  base-offset: 15
   blocks-per-tick: 20000
   glass:
     height: 40
@@ -114,25 +112,48 @@ arena:
 walls:
   material: SANDSTONE
   thickness: 3
-  height: 14
-  vault-radius: 6
   fall-ticks: 20
 bases:
   pedestal-material: STONE_BRICKS
 center:
   chests: 8
   ring-radius: 3
-teams:
-  count: 4
-  min-players-per-team: 1
+caves:
+  enabled: true
+  seed: 20260830
+  tunnels: 8
+  tunnel-length: 90
+  wall-margin: 3
+  chests: 3
 objective:
   max-health: 1000
+  # One break destroys a wool: the same code path, far less digging.
   damage-per-break: 1000
 game:
   countdown-seconds: 3
-  grace-seconds: 20
   respawn-seconds: 1
   end-seconds: 5
+stats:
+  enabled: true
+modes:
+  test:
+    teams: 4
+    shape: SQUARE
+    radius: 25
+    players-per-team: 4
+    wall-height: 14
+    vault-radius: 6
+    base-offset: 15
+    grace-seconds: 20
+default-mode: test
+arenas:
+  main:
+    mode: test
+    # The main world on purpose - see the note at the top of this config.
+    world: world
+  second:
+    mode: duel
+    world: walls_second
 MATCHCFG
 
   rm -rf "$RUN_DIR/world" "$RUN_DIR/walls_arena"
@@ -332,6 +353,20 @@ if sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" \
 else
   die "no caves were carved into the platform"
 fi
+
+step "Switching to the 5-team circular mode and rebuilding"
+console "walls mode large"; sleep 3
+console "walls reset"
+wait_for 'Arena ready' 300 || die "the circular 5-team arena never finished building"
+console "walls status"; sleep 3
+
+if sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" | grep -qE '^\[.*Aqua: .* wool '; then
+  echo "    ok    a fifth team exists with its own colour"
+else
+  die "the 5-team mode did not produce five distinct teams"
+fi
+sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" | tail -40 \
+  | grep -E '(Red|Blue|Green|Yellow|Aqua): .* wool' | tail -5 | sed 's/^/          /'
 
 step "Stopping the server"
 console "stop"

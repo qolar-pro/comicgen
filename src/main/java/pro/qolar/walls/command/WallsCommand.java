@@ -1,7 +1,5 @@
 package pro.qolar.walls.command;
 
-import org.bukkit.Bukkit;
-import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabExecutor;
@@ -283,8 +281,7 @@ public final class WallsCommand implements TabExecutor {
             return;
         }
         if (args.length > 1) {
-            OfflinePlayer target = Bukkit.getOfflinePlayer(args[1]);
-            StatsStore.Record record = store.of(target.getUniqueId());
+            StatsStore.Record record = store.byName(args[1]);
             if (record == null) {
                 Msg.send(sender, "&7No record for &f" + args[1] + "&7 yet.");
                 return;

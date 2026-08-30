@@ -5,13 +5,10 @@ import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
 import pro.qolar.walls.arena.VoidChunkGenerator;
 import pro.qolar.walls.command.WallsCommand;
-import pro.qolar.walls.game.GameManager;
 import pro.qolar.walls.game.SpectatorMenu;
 import pro.qolar.walls.listener.GameListener;
 import pro.qolar.walls.stats.StatsStore;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Map;
 
 /** Plugin entry point. */
@@ -37,8 +34,8 @@ public final class WallsPlugin extends JavaPlugin {
         arenas = new ArenaRegistry();
 
         try {
-            for (Map.Entry<String, String> entry : settings.arenas().entrySet()) {
-                ModeSettings mode = settings.mode(entry.getValue());
+            for (Map.Entry<String, WallsConfig.ArenaDefinition> entry : settings.arenas().entrySet()) {
+                ModeSettings mode = settings.mode(entry.getValue().mode());
                 ArenaInstance instance = new ArenaInstance(this, settings, entry.getKey(), mode);
                 instance.arena().ensureWorld();
                 arenas.add(instance);
@@ -52,10 +49,7 @@ public final class WallsPlugin extends JavaPlugin {
         }
 
         getServer().getPluginManager().registerEvents(new GameListener(arenas), this);
-
-        List<GameManager> games = new ArrayList<>();
-        arenas.all().forEach(instance -> games.add(instance.game()));
-        getServer().getPluginManager().registerEvents(new SpectatorMenu(games), this);
+        getServer().getPluginManager().registerEvents(new SpectatorMenu(), this);
 
         PluginCommand command = getCommand("walls");
         if (command == null) {

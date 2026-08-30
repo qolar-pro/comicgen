@@ -187,6 +187,14 @@ async function main() {
   step(`Connecting to ${HOST}:${PORT} (Minecraft ${VERSION})`);
   rcon = await Rcon.connect({ host: HOST, port: RCON_PORT, password: RCON_PASSWORD });
 
+  step('Two arenas should be configured, each in its own world');
+  const arenaList = await send('walls arenas');
+  check(/\bmain\b/.test(arenaList) && /\bsecond\b/.test(arenaList),
+    'both arenas are registered');
+  check(/world/.test(arenaList) && /walls_second/.test(arenaList),
+    'each arena has its own world');
+  arenaList.trim().split('\n').forEach((line) => log(line.trim()));
+
   step('Building the arena');
   await send('walls reset');
   await waitFor((s) => s.built, 'the arena to finish building', 180000);

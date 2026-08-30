@@ -121,9 +121,14 @@ default-mode: small
 
 # One arena per world. With a single arena the world keeps the plain name above;
 # with several, each gets the name suffixed (walls_arena_main, walls_arena_duel).
+# Set 'world' on an arena to place it in a specific world instead. Two arenas
+# may not share a world - the plugin refuses to start if they do.
 arenas:
   main:
     mode: small
+  # second:
+  #   mode: duel
+  #   world: walls_duel
 
 stats:
   # Per-player matches, wins, kills, deaths and wool broken, kept in stats.yml.

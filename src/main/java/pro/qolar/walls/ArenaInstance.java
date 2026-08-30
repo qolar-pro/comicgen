@@ -4,6 +4,7 @@ import pro.qolar.walls.arena.Arena;
 import pro.qolar.walls.arena.ArenaGeometry;
 import pro.qolar.walls.arena.SectorLayout;
 import pro.qolar.walls.game.GameManager;
+import pro.qolar.walls.game.TeamColor;
 
 /**
  * One playable arena: its world, its current mode, and the match running in it.
@@ -36,6 +37,10 @@ public final class ArenaInstance {
     }
 
     private void assemble() {
+        if (mode.teams() > TeamColor.MAX_TEAMS) {
+            throw new IllegalArgumentException("mode '" + mode.name() + "' asks for " + mode.teams()
+                    + " teams, but only " + TeamColor.MAX_TEAMS + " team colours exist");
+        }
         ArenaGeometry geometry = config.geometryFor(mode);
         int baseOffset = config.baseOffsetFor(mode, geometry, plugin.getLogger());
         SectorLayout layout = SectorLayout.forGeometry(geometry, baseOffset);

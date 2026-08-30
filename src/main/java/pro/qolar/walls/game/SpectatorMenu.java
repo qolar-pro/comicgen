@@ -13,7 +13,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 import pro.qolar.walls.util.Msg;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -63,12 +62,6 @@ public final class SpectatorMenu implements Listener {
             head.setItemMeta(meta);
         }
         return head;
-    }
-
-    private final List<GameManager> games = new ArrayList<>();
-
-    public SpectatorMenu(List<GameManager> games) {
-        this.games.addAll(games);
     }
 
     @EventHandler
