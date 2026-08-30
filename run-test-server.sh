@@ -5,12 +5,17 @@
 #   ./run-test-server.sh                 # interactive, latest tested version
 #   ./run-test-server.sh 1.20.6          # a specific Minecraft version
 #   ./run-test-server.sh 1.21.4 --smoke  # scripted check, no keyboard needed
+#   ./run-test-server.sh 1.21.4 --match  # full match driven by real bot players
 #
 # Everything lands in run/<version>/, which is gitignored. Delete it to start over.
 #
 # --smoke drives the plugin from the server console and then reports whether any
 # exception showed up in the log. It is the check that proves the plugin really
 # loads and builds an arena, rather than merely compiling.
+#
+# --match goes further: it connects real clients with mineflayer and plays a whole
+# match, which is the only way to cover PvP, respawns, wool breaking and the win
+# condition. Requires `npm install` in tools/.
 
 set -euo pipefail
 
@@ -71,6 +76,10 @@ view-distance=6
 simulation-distance=4
 motd=Walls test server
 sync-chunk-writes=false
+enable-rcon=true
+rcon.port=25575
+rcon.password=wallstest
+broadcast-rcon-to-ops=false
 PROPS
 
 cp -f "$PLUGIN_JAR" "$RUN_DIR/plugins/"
@@ -79,6 +88,92 @@ log "Server directory: $RUN_DIR"
 # --- run --------------------------------------------------------------------
 
 JAVA_ARGS=(-Xms1G -Xmx2G -XX:+UseG1GC)
+
+if [ "$MODE" = "--match" ]; then
+  command -v node >/dev/null || die "node is required for --match"
+  [ -d "$REPO_DIR/tools/node_modules" ] || die "run 'npm install' in tools/ first"
+
+  # A small arena with short phases keeps the run quick. damage-per-break equals
+  # max-health so one break destroys a wool - the same code path, far less digging.
+  mkdir -p "$RUN_DIR/plugins/Walls"
+  cat > "$RUN_DIR/plugins/Walls/config.yml" <<'MATCHCFG'
+arena:
+  # The main world on purpose: bots joining land straight in the arena, and
+  # mineflayer's client-side chunk cache does not survive a dimension change.
+  world: world
+  center-x: 0
+  center-z: 0
+  radius: 25
+  floor-y: 64
+  thickness: 50
+  base-offset: 15
+  blocks-per-tick: 20000
+  glass:
+    height: 40
+    material: GLASS
+walls:
+  material: SANDSTONE
+  thickness: 3
+  height: 14
+  vault-radius: 6
+  fall-ticks: 20
+bases:
+  pedestal-material: STONE_BRICKS
+center:
+  chests: 8
+  ring-radius: 3
+teams:
+  count: 4
+  min-players-per-team: 1
+objective:
+  max-health: 1000
+  damage-per-break: 1000
+game:
+  countdown-seconds: 3
+  grace-seconds: 20
+  respawn-seconds: 1
+  end-seconds: 5
+MATCHCFG
+
+  rm -rf "$RUN_DIR/world" "$RUN_DIR/walls_arena"
+  cd "$RUN_DIR"
+  java "${JAVA_ARGS[@]}" -jar paper.jar nogui > "$RUN_DIR/console.out" 2>&1 &
+  SERVER_PID=$!
+  trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+  log "Waiting for the server to start..."
+  waited=0
+  until grep -qF 'Done (' "$RUN_DIR/console.out" 2>/dev/null; do
+    kill -0 "$SERVER_PID" 2>/dev/null || die "server exited during startup"
+    [ "$waited" -lt 420 ] || die "server never finished starting"
+    sleep 2; waited=$((waited + 2))
+  done
+  grep -qF 'Walls enabled' "$RUN_DIR/console.out" || die "the plugin did not enable"
+
+  log "Running the match test"
+  set +e
+  WALLS_MC_VERSION="$MC_VERSION" WALLS_BASE_OFFSET=15 WALLS_FLOOR_Y=64 WALLS_BOTS=4 \
+    node "$REPO_DIR/tools/match-test.js"
+  MATCH_STATUS=$?
+  set -e
+
+  echo
+  log "===== Errors and exceptions ====="
+  if sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" \
+       | grep -nE 'Exception|SEVERE|at pro\.qolar|Caused by:' | head -30; then
+    MATCH_STATUS=1
+  else
+    echo "    none"
+  fi
+
+  kill "$SERVER_PID" 2>/dev/null || true
+  wait "$SERVER_PID" 2>/dev/null || true
+
+  echo
+  [ "$MATCH_STATUS" -eq 0 ] && log "MATCH TEST PASSED for Minecraft $MC_VERSION" \
+    || die "match test failed for Minecraft $MC_VERSION"
+  exit 0
+fi
 
 if [ "$MODE" != "--smoke" ]; then
   log "Starting Paper $MC_VERSION (Ctrl-C or 'stop' to quit)"

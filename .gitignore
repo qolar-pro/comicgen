@@ -16,3 +16,4 @@ run/
 
 # OS
 .DS_Store
+tools/node_modules/

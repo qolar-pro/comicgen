@@ -1,0 +1,11 @@
+{
+  "name": "walls-test-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bot-driven end-to-end tests for the Walls plugin.",
+  "type": "commonjs",
+  "dependencies": {
+    "mineflayer": "^4.38.0",
+    "rcon-client": "^4.2.5"
+  }
+}
