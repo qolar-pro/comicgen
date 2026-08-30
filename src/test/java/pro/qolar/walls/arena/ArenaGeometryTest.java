@@ -130,6 +130,61 @@ class ArenaGeometryTest {
         assertThrows(IllegalArgumentException.class, () -> g.chestOffsets(8, VAULT_RADIUS));
     }
 
+    /**
+     * Guards against silent drift in the arena's size. These counts are derived by
+     * hand from the default settings, and a live server building this arena
+     * reported exactly 800,476 block placements - so if this test starts failing,
+     * the shape of the map has changed.
+     */
+    @Test
+    void theArenaIsExactlyTheSizeWeThinkItIs() {
+        ArenaGeometry g = geometry();
+
+        int platformColumns = 0;
+        int wallColumns = 0;
+        int vaultRingColumns = 0;
+        for (int dx = -RADIUS; dx <= RADIUS; dx++) {
+            for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+                if (g.isPlatform(dx, dz)) {
+                    platformColumns++;
+                }
+                if (g.isWallColumn(dx, dz)) {
+                    wallColumns++;
+                    if (ArenaGeometry.chebyshev(dx, dz) == VAULT_RADIUS) {
+                        vaultRingColumns++;
+                    }
+                }
+            }
+        }
+
+        assertEquals(121 * 121, platformColumns, "a 121x121 playing surface");
+        assertEquals(8 * VAULT_RADIUS, vaultRingColumns, "the vault ring is one square ring");
+        // Four arms, each WALL_THICKNESS wide, running from the vault edge (7) to
+        // the arena edge (60): 4 * 3 * 54 = 648.
+        assertEquals(4 * WALL_THICKNESS * (RADIUS - VAULT_RADIUS), wallColumns - vaultRingColumns,
+                "four arms of the configured width reaching the edge");
+        assertEquals(696, wallColumns);
+
+        int glassColumns = 0;
+        for (int dx = -RADIUS - 1; dx <= RADIUS + 1; dx++) {
+            for (int dz = -RADIUS - 1; dz <= RADIUS + 1; dz++) {
+                if (g.isGlassColumn(dx, dz)) {
+                    glassColumns++;
+                }
+            }
+        }
+        assertEquals(123 * 123 - 121 * 121, glassColumns, "one ring of glass around the platform");
+
+        // Total placements, matching what the server actually reported.
+        int wallHeight = g.wallTopY() - g.floorY();
+        int lidExtra = (2 * VAULT_RADIUS + 1) * (2 * VAULT_RADIUS + 1) - vaultRingColumns;
+        int total = platformColumns * THICKNESS
+                + glassColumns * (g.ceilingY() - g.bottomY())
+                + 123 * 123
+                + wallColumns * wallHeight + lidExtra;
+        assertEquals(800_476, total, "a live server placed exactly this many blocks");
+    }
+
     // --- sealing: the property the whole minigame depends on -------------
 
     /**
