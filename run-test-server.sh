@@ -278,6 +278,11 @@ check_block up/vault-ring         6  70   0 minecraft:sandstone
 check_block up/vault-interior     0  70   0 minecraft:air
 check_block up/loot-chest         0  65  -3 minecraft:chest
 check_block up/base-pedestal     30  64  30 minecraft:stone_bricks
+# The walls run the full depth of the platform; stopping them at the surface
+# would let players simply tunnel under them into an enemy sector.
+check_block up/wall-underground   0  40  20 minecraft:sandstone
+check_block up/wall-deep          0  17  20 minecraft:sandstone
+check_block up/bedrock-under-wall 0  15  20 minecraft:bedrock
 sleep 5
 assert_checks
 
@@ -292,6 +297,10 @@ check_block down/vault-ring-gone   6  70   0 minecraft:air
 check_block down/chest-survived    0  65  -3 minecraft:chest
 check_block down/grass-untouched  50  64  50 minecraft:grass_block
 check_block down/bedrock-untouched 0  15   0 minecraft:bedrock
+# Underground the wall reverts to ordinary rock rather than air, or dropping the
+# walls would leave a chasm the depth of the platform.
+check_block down/wall-became-stone 0  40  20 minecraft:stone
+check_block down/wall-became-grass 0  64  20 minecraft:grass_block
 sleep 5
 assert_checks
 
@@ -303,6 +312,7 @@ sleep 2
 step "Checking the walls went back"
 check_block reraised/arm        0 70 20 minecraft:sandstone
 check_block reraised/vault-ring 6 70  0 minecraft:sandstone
+check_block reraised/underground 0 40 20 minecraft:sandstone
 sleep 5
 assert_checks
 

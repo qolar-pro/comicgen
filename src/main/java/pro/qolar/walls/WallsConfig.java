@@ -3,7 +3,7 @@ package pro.qolar.walls;
 import org.bukkit.Material;
 import org.bukkit.configuration.file.FileConfiguration;
 import pro.qolar.walls.arena.ArenaGeometry;
-import pro.qolar.walls.arena.SectorLayout;
+import pro.qolar.walls.arena.ArenaShape;
 
 import java.util.logging.Logger;
 
@@ -38,6 +38,7 @@ public final class WallsConfig {
     private final int chestRingRadius;
 
     private final int teamCount;
+    private final ArenaShape shape;
     private final int objectiveMaxHealth;
     private final int objectiveDamagePerBreak;
 
@@ -71,7 +72,8 @@ public final class WallsConfig {
         this.chestCount = Math.max(0, config.getInt("center.chests", 8));
         this.chestRingRadius = config.getInt("center.ring-radius", 3);
 
-        this.teamCount = config.getInt("teams.count", SectorLayout.QUADRANT_TEAMS);
+        this.teamCount = config.getInt("teams.count", 4);
+        this.shape = readShape(config, teamCount, log);
         this.minPlayersPerTeam = Math.max(1, config.getInt("teams.min-players-per-team", 1));
 
         this.objectiveMaxHealth = Math.max(1, config.getInt("objective.max-health", 1000));
@@ -83,8 +85,8 @@ public final class WallsConfig {
         this.endSeconds = Math.max(1, config.getInt("game.end-seconds", 10));
 
         // Constructing the geometry validates the whole arena shape up front.
-        this.geometry = new ArenaGeometry(radius, floorY, thickness, wallThickness,
-                wallHeight, vaultRadius, glassHeight);
+        this.geometry = new ArenaGeometry(shape, teamCount, radius, floorY, thickness,
+                wallThickness, wallHeight, vaultRadius, glassHeight);
 
         int autoOffset = Math.max(vaultRadius + 4, radius / 2);
         int configured = config.getInt("arena.base-offset", 0);
@@ -99,6 +101,24 @@ public final class WallsConfig {
         if (chestCount > 0 && (chestRingRadius < 1 || chestRingRadius >= vaultRadius)) {
             throw new IllegalArgumentException(
                     "center.ring-radius must be between 1 and walls.vault-radius - 1, got " + chestRingRadius);
+        }
+    }
+
+    /**
+     * Four teams get the classic square split by a cross; any other count gets a
+     * circle, because a square cannot be divided into five equal sectors.
+     */
+    private static ArenaShape readShape(FileConfiguration config, int teamCount, Logger log) {
+        String name = config.getString("arena.shape");
+        if (name == null || name.isBlank() || name.equalsIgnoreCase("auto")) {
+            return ArenaShape.defaultFor(teamCount);
+        }
+        try {
+            return ArenaShape.valueOf(name.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException unknown) {
+            log.warning("Unknown arena.shape '" + name + "'; using "
+                    + ArenaShape.defaultFor(teamCount) + " for " + teamCount + " teams");
+            return ArenaShape.defaultFor(teamCount);
         }
     }
 
@@ -166,6 +186,10 @@ public final class WallsConfig {
 
     public int teamCount() {
         return teamCount;
+    }
+
+    public ArenaShape shape() {
+        return shape;
     }
 
     public int minPlayersPerTeam() {

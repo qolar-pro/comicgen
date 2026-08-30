@@ -4,25 +4,25 @@ package pro.qolar.walls.arena;
  * One team's slice of the arena, in arena-local coordinates.
  *
  * <p>Pure geometry, no Bukkit. A sector knows where its team's base sits and
- * which columns belong to it.
+ * defers to {@link ArenaGeometry} for which columns belong to it, so there is
+ * only ever one definition of where the boundaries are.
  */
 public final class Sector {
 
+    private final ArenaGeometry geometry;
     private final int index;
-    private final int signX;
-    private final int signZ;
     private final int baseDx;
     private final int baseDz;
     private final float spawnYaw;
 
-    Sector(int index, int signX, int signZ, int baseOffset) {
+    Sector(ArenaGeometry geometry, int index, int baseDx, int baseDz) {
+        this.geometry = geometry;
         this.index = index;
-        this.signX = signX;
-        this.signZ = signZ;
-        this.baseDx = signX * baseOffset;
-        this.baseDz = signZ * baseOffset;
+        this.baseDx = baseDx;
+        this.baseDz = baseDz;
         // Face the arena centre, so players spawn looking at the action.
-        this.spawnYaw = (float) Math.toDegrees(Math.atan2(signX, -signZ));
+        // Minecraft yaw: 0 is +Z, 90 is -X.
+        this.spawnYaw = (float) Math.toDegrees(Math.atan2(baseDx, -baseDz));
     }
 
     public int index() {
@@ -42,14 +42,10 @@ public final class Sector {
     }
 
     /**
-     * True when a column falls in this sector. Columns sitting exactly on an axis
-     * belong to no sector - those are the wall arms.
+     * True when a column falls in this sector. Columns on a wall, inside the
+     * vault, or outside the arena belong to no sector.
      */
     public boolean contains(int dx, int dz) {
-        return sameSide(dx, signX) && sameSide(dz, signZ);
-    }
-
-    private static boolean sameSide(int value, int sign) {
-        return sign > 0 ? value > 0 : value < 0;
+        return geometry.sectorOf(dx, dz) == index;
     }
 }

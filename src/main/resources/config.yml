@@ -10,6 +10,12 @@ arena:
   center-x: 0
   center-z: 0
 
+  # SQUARE, CIRCLE, or auto. Four teams default to SQUARE - the classic square
+  # split by a cross. Any other count defaults to CIRCLE, because a square
+  # cannot be divided into five equal sectors and the corner teams would get a
+  # bigger share of the map.
+  shape: auto
+
   # Half-width of the playing surface. The arena is (2 * radius + 1) blocks
   # across, so 60 gives a 121x121 map. Raise it for 100-player games; lower it
   # for quick small ones.
@@ -43,7 +49,10 @@ walls:
   # Width of each of the four arms. Must be an odd number so it has a centre.
   thickness: 3
 
-  # How far the walls stand above the floor.
+  # How far the walls stand above the floor. Walls also run the full depth of
+  # the platform below it, so nobody can simply dig underneath them. Building is
+  # capped three blocks below the top while they stand, so nobody can pillar up
+  # and walk over them either.
   height: 14
 
   # Half-width of the sealed loot vault at the centre. Its interior stays open
@@ -64,8 +73,10 @@ center:
   ring-radius: 3
 
 teams:
-  # Only 4 is supported in this version - the square is split into quadrants.
-  # Radial layouts for 5+ teams are not implemented yet.
+  # Any count from 2 upwards. Four on a square is the classic cross; other
+  # counts get a circular arena with equal pie-slice sectors. Very high counts
+  # need a larger walls.vault-radius so the arms do not merge at the centre -
+  # the plugin says so at startup if the numbers do not work.
   count: 4
   min-players-per-team: 1
 

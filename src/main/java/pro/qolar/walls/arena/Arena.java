@@ -33,6 +33,7 @@ public final class Arena {
     private final WallsConfig config;
     private final ArenaGeometry geo;
     private final SectorLayout layout;
+    private final ColumnMap columns;
     private final Random random = new Random();
 
     private World world;
@@ -46,6 +47,7 @@ public final class Arena {
         this.config = config;
         this.geo = config.geometry();
         this.layout = layout;
+        this.columns = ColumnMap.of(geo);
     }
 
     // --- world -----------------------------------------------------------
@@ -80,7 +82,7 @@ public final class Arena {
         w.setTime(6000L);
         w.setStorm(false);
         w.setAutoSave(false);
-        // Land on the vault roof: a safe vantage point over all four quadrants.
+        // Land on the vault roof: a safe vantage point over every sector.
         w.setSpawnLocation(config.centerX(), geo.wallTopY() + 1, config.centerZ());
     }
 
@@ -94,6 +96,10 @@ public final class Arena {
 
     public SectorLayout layout() {
         return layout;
+    }
+
+    public ColumnMap columns() {
+        return columns;
     }
 
     public boolean isBuilt() {
@@ -151,7 +157,8 @@ public final class Arena {
                 || !location.getWorld().getName().equals(world.getName())) {
             return false;
         }
-        return geo.isUnderCeiling(localX(location.getBlockX()), localZ(location.getBlockZ()));
+        return columns.at(localX(location.getBlockX()), localZ(location.getBlockZ()))
+                != ColumnMap.Column.OUTSIDE;
     }
 
     // --- protection ------------------------------------------------------
@@ -171,21 +178,29 @@ public final class Arena {
         if (y <= geo.bottomY()) {
             return true;
         }
-        if (geo.isGlassColumn(dx, dz) || y >= geo.ceilingY()) {
+        if (columns.at(dx, dz) == ColumnMap.Column.GLASS || y >= geo.ceilingY()) {
             return true;
         }
         return wallsUp && isWallBlock(dx, dz, y);
     }
 
-    /** Whether a position belongs to the wall structure (arms plus the vault shell and lid). */
+    /**
+     * Whether a position belongs to the wall structure.
+     *
+     * <p>Walls run the full depth of the platform, not merely above ground. Stop
+     * them at the surface and a player simply digs under them during the grace
+     * period and walks into an enemy base.
+     */
     public boolean isWallBlock(int dx, int dz, int y) {
-        if (y <= geo.floorY() || y > geo.wallTopY()) {
+        if (y < geo.wallBottomY() || y > geo.wallTopY()) {
             return false;
         }
-        if (y == geo.wallTopY() && geo.isVaultLid(dx, dz)) {
+        ColumnMap.Column column = columns.at(dx, dz);
+        if (column == ColumnMap.Column.WALL) {
             return true;
         }
-        return geo.isWallColumn(dx, dz);
+        // The vault's roof slab caps its air pocket.
+        return column == ColumnMap.Column.VAULT_INTERIOR && y == geo.wallTopY();
     }
 
     // --- building --------------------------------------------------------
@@ -227,7 +242,7 @@ public final class Arena {
 
     /** The whole arena as one volume - platform, glass, walls, and air everywhere else. */
     private ArenaBuilder.BlockVolume fullVolume() {
-        int reach = geo.radius() + 1;
+        int reach = columns.reach();
         return new ArenaBuilder.BlockVolume() {
             @Override
             public int minX() {
@@ -261,28 +276,42 @@ public final class Arena {
 
             @Override
             public Material materialAt(int x, int y, int z) {
-                int dx = localX(x);
-                int dz = localZ(z);
+                return blockFor(localX(x), y, localZ(z));
+            }
+        };
+    }
 
-                if (y == geo.ceilingY()) {
-                    return geo.isUnderCeiling(dx, dz) ? config.glassMaterial() : null;
+    /** What belongs at one position of a freshly built arena. */
+    private Material blockFor(int dx, int y, int dz) {
+        switch (columns.at(dx, dz)) {
+            case OUTSIDE:
+                return null;
+            case GLASS:
+                return config.glassMaterial();
+            case WALL:
+                if (y == geo.bottomY()) {
+                    return Material.BEDROCK;
                 }
-                if (geo.isGlassColumn(dx, dz)) {
-                    return config.glassMaterial();
+                if (y <= geo.wallTopY()) {
+                    return config.wallMaterial();
                 }
-                if (!geo.isPlatform(dx, dz)) {
-                    return null;
-                }
+                return y < geo.ceilingY() ? Material.AIR : config.glassMaterial();
+            case VAULT_INTERIOR:
                 if (y <= geo.floorY()) {
                     return layerMaterial(geo.layerAtY(y));
                 }
-                if (isWallBlock(dx, dz, y)) {
+                if (y == geo.wallTopY()) {
                     return config.wallMaterial();
                 }
-                // Above the floor and not a wall: air, so a reset wipes player builds.
-                return Material.AIR;
-            }
-        };
+                return y < geo.ceilingY() ? Material.AIR : config.glassMaterial();
+            case PLATFORM:
+            default:
+                if (y <= geo.floorY()) {
+                    return layerMaterial(geo.layerAtY(y));
+                }
+                // Above the floor: air, so a reset wipes player builds.
+                return y < geo.ceilingY() ? Material.AIR : config.glassMaterial();
+        }
     }
 
     private Material layerMaterial(ArenaGeometry.Layer layer) {
@@ -345,15 +374,15 @@ public final class Arena {
         if (wallTask != null) {
             throw new IllegalStateException("the walls are already moving");
         }
-        int height = geo.wallTopY() - geo.floorY();
-        long interval = Math.max(1L, config.wallFallTicks() / Math.max(1, height));
+        int levels = geo.wallTopY() - geo.wallBottomY() + 1;
+        long interval = Math.max(1L, config.wallFallTicks() / Math.max(1, levels));
 
         wallTask = new BukkitRunnable() {
             private int step;
 
             @Override
             public void run() {
-                if (step >= height) {
+                if (step >= levels) {
                     cancel();
                     wallTask = null;
                     wallsUp = raising;
@@ -362,7 +391,7 @@ public final class Arena {
                     return;
                 }
                 // Raising builds from the ground up; dropping peels from the top down.
-                int y = raising ? geo.floorY() + 1 + step : geo.wallTopY() - step;
+                int y = raising ? geo.wallBottomY() + step : geo.wallTopY() - step;
                 applyWallLayer(y, raising);
                 step++;
             }
@@ -370,19 +399,30 @@ public final class Arena {
     }
 
     private void applyWallLayer(int y, boolean solid) {
-        Material material = solid ? config.wallMaterial() : Material.AIR;
         int r = geo.radius();
         for (int dx = -r; dx <= r; dx++) {
             for (int dz = -r; dz <= r; dz++) {
                 if (!isWallBlock(dx, dz, y)) {
                     continue;
                 }
+                Material material = solid ? config.wallMaterial() : wallReplacement(y);
                 Block block = world.getBlockAt(worldX(dx), y, worldZ(dz));
                 if (block.getType() != material) {
                     block.setType(material, false);
                 }
             }
         }
+    }
+
+    /**
+     * What a wall block becomes when the walls come down.
+     *
+     * <p>Above ground it becomes air, which is the drama. Below ground it becomes
+     * ordinary terrain rather than air - clearing it would leave a chasm the depth
+     * of the platform where the wall used to stand.
+     */
+    private Material wallReplacement(int y) {
+        return y > geo.floorY() ? Material.AIR : layerMaterial(geo.layerAtY(y));
     }
 
     /** Stop any running build or wall animation - used when the plugin shuts down. */

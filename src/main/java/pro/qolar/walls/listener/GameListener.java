@@ -70,11 +70,13 @@ public final class GameListener implements Listener {
             Msg.send(player, "&cWait for the match to begin.");
             return;
         }
-        // While the walls stand, nobody towers over them.
-        int wallTop = arena.geometry().wallTopY();
-        if (game.state() == GameState.GRACE && event.getBlock().getY() > wallTop) {
+        // While the walls stand, nobody towers over them. The ceiling sits well
+        // below the wall top: building level with it would let a player step
+        // straight onto the wall and walk into the next sector.
+        int ceiling = arena.geometry().graceBuildCeilingY();
+        if (game.state() == GameState.GRACE && event.getBlock().getY() > ceiling) {
             event.setCancelled(true);
-            Msg.send(player, "&cYou cannot build above the walls before they fall.");
+            Msg.send(player, "&cYou cannot build that high before the walls fall.");
         }
     }
 

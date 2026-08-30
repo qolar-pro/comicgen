@@ -30,7 +30,7 @@ public final class WallsPlugin extends JavaPlugin {
             return;
         }
 
-        SectorLayout layout = SectorLayout.forTeams(config.teamCount(), config.baseOffset());
+        SectorLayout layout = SectorLayout.forGeometry(config.geometry(), config.baseOffset());
         arena = new Arena(this, config, layout);
         game = new GameManager(this, config, arena);
 
