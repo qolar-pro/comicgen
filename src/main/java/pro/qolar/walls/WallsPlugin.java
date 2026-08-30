@@ -1,28 +1,31 @@
 package pro.qolar.walls;
 
-import org.bukkit.World;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.generator.ChunkGenerator;
 import org.bukkit.plugin.java.JavaPlugin;
-import pro.qolar.walls.arena.Arena;
-import pro.qolar.walls.arena.SectorLayout;
 import pro.qolar.walls.arena.VoidChunkGenerator;
 import pro.qolar.walls.command.WallsCommand;
 import pro.qolar.walls.game.GameManager;
+import pro.qolar.walls.game.SpectatorMenu;
 import pro.qolar.walls.listener.GameListener;
+import pro.qolar.walls.stats.StatsStore;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /** Plugin entry point. */
 public final class WallsPlugin extends JavaPlugin {
 
-    private WallsConfig config;
-    private Arena arena;
-    private GameManager game;
+    private WallsConfig settings;
+    private ArenaRegistry arenas;
+    private StatsStore stats;
 
     @Override
     public void onEnable() {
         saveDefaultConfig();
         try {
-            config = new WallsConfig(getConfig(), getLogger());
+            settings = new WallsConfig(getConfig(), getLogger());
         } catch (IllegalArgumentException invalid) {
             getLogger().severe("config.yml is invalid: " + invalid.getMessage());
             getLogger().severe("Fix the configuration and restart; Walls will not enable.");
@@ -30,20 +33,29 @@ public final class WallsPlugin extends JavaPlugin {
             return;
         }
 
-        SectorLayout layout = SectorLayout.forGeometry(config.geometry(), config.baseOffset());
-        arena = new Arena(this, config, layout);
-        game = new GameManager(this, config, arena);
+        stats = new StatsStore(this, settings.statsEnabled());
+        arenas = new ArenaRegistry();
 
         try {
-            World world = arena.ensureWorld();
-            getLogger().info("Arena world '" + world.getName() + "' ready.");
+            for (Map.Entry<String, String> entry : settings.arenas().entrySet()) {
+                ModeSettings mode = settings.mode(entry.getValue());
+                ArenaInstance instance = new ArenaInstance(this, settings, entry.getKey(), mode);
+                instance.arena().ensureWorld();
+                arenas.add(instance);
+                getLogger().info("Arena '" + instance.name() + "' ready in world '"
+                        + instance.worldName() + "' - mode " + mode);
+            }
         } catch (RuntimeException failed) {
-            getLogger().severe("Could not prepare the arena world: " + failed.getMessage());
+            getLogger().severe("Could not prepare the arenas: " + failed.getMessage());
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
 
-        getServer().getPluginManager().registerEvents(new GameListener(game), this);
+        getServer().getPluginManager().registerEvents(new GameListener(arenas), this);
+
+        List<GameManager> games = new ArrayList<>();
+        arenas.all().forEach(instance -> games.add(instance.game()));
+        getServer().getPluginManager().registerEvents(new SpectatorMenu(games), this);
 
         PluginCommand command = getCommand("walls");
         if (command == null) {
@@ -51,23 +63,25 @@ public final class WallsPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
-        command.setExecutor(new WallsCommand(this, game));
+        command.setExecutor(new WallsCommand(this, arenas));
 
-        getLogger().info("Walls enabled. Run /walls reset to build the arena.");
+        getLogger().info("Walls enabled with " + arenas.size() + " arena(s). Run /walls reset to build.");
     }
 
     @Override
     public void onDisable() {
-        if (game != null) {
-            game.shutdown();
+        if (arenas != null) {
+            for (ArenaInstance instance : arenas.all()) {
+                instance.shutdown();
+            }
         }
-        if (arena != null) {
-            arena.shutdown();
+        if (stats != null) {
+            stats.save();
         }
     }
 
     /**
-     * Lets the arena world be recreated from bukkit.yml or a world manager and
+     * Lets an arena world be recreated from bukkit.yml or a world manager and
      * still come back empty.
      */
     @Override
@@ -75,15 +89,15 @@ public final class WallsPlugin extends JavaPlugin {
         return new VoidChunkGenerator();
     }
 
-    public Arena arena() {
-        return arena;
-    }
-
-    public GameManager game() {
-        return game;
+    public ArenaRegistry arenas() {
+        return arenas;
     }
 
     public WallsConfig settings() {
-        return config;
+        return settings;
+    }
+
+    public StatsStore stats() {
+        return stats;
     }
 }

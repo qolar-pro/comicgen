@@ -490,9 +490,11 @@ class ArenaGeometryTest {
 
     /**
      * Guards against silent drift in the arena's size. A live server building the
-     * default arena reported exactly 800,476 block placements, and the count is
-     * unchanged by walls running the full depth: a wall column held fifty layers
-     * plus fourteen wall blocks before, and one bedrock plus sixty-three now.
+     * default arena with caves switched off reported exactly 800,476 block
+     * placements, and the count is unchanged by walls running the full depth: a
+     * wall column held fifty layers plus fourteen wall blocks before, and one
+     * bedrock plus sixty-three now. Caves lower the figure on a live server by
+     * hollowing stone out again; this is the solid-platform baseline.
      */
     @Test
     void theArenaIsExactlyTheSizeWeThinkItIs() {

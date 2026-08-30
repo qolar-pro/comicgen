@@ -10,17 +10,6 @@ arena:
   center-x: 0
   center-z: 0
 
-  # SQUARE, CIRCLE, or auto. Four teams default to SQUARE - the classic square
-  # split by a cross. Any other count defaults to CIRCLE, because a square
-  # cannot be divided into five equal sectors and the corner teams would get a
-  # bigger share of the map.
-  shape: auto
-
-  # Half-width of the playing surface. The arena is (2 * radius + 1) blocks
-  # across, so 60 gives a 121x121 map. Raise it for 100-player games; lower it
-  # for quick small ones.
-  radius: 60
-
   # Y of the grass surface everyone plays on.
   floor-y: 64
 
@@ -28,9 +17,6 @@ arena:
   # 1 grass, 4 dirt, then stone, then 1 bedrock - so most of this depth is solid
   # stone, which is where caves and ore can be carved in later.
   thickness: 50
-
-  # Distance from the centre to each team's base. 0 = choose automatically.
-  base-offset: 0
 
   # Block changes per tick while building. Higher rebuilds faster but costs more
   # per tick; the default keeps a full rebuild at a couple of seconds with no
@@ -49,18 +35,33 @@ walls:
   # Width of each of the four arms. Must be an odd number so it has a centre.
   thickness: 3
 
-  # How far the walls stand above the floor. Walls also run the full depth of
-  # the platform below it, so nobody can simply dig underneath them. Building is
-  # capped three blocks below the top while they stand, so nobody can pillar up
-  # and walk over them either.
-  height: 14
-
-  # Half-width of the sealed loot vault at the centre. Its interior stays open
-  # so the chests inside survive the walls coming down.
-  vault-radius: 6
+  # Walls run the full depth of the platform as well as standing above it, so
+  # nobody can dig underneath them. Building is capped three blocks below the
+  # top while they stand, so nobody can pillar up and walk over them either.
+  # Height and vault radius are set per mode, below.
 
   # How long the walls take to rise or fall, in ticks (20 ticks = 1 second).
   fall-ticks: 40
+
+caves:
+  # Caves and ore are carved into the stone body of the platform - the reason
+  # the platform is fifty blocks deep. Carving never touches a wall column or
+  # anything within wall-margin of one, so tunnelling between sectors stays
+  # impossible.
+  enabled: true
+
+  # 0 picks a fresh seed on every rebuild. Set a number for a repeatable map.
+  seed: 0
+
+  # How many tunnels to dig, and how far each one runs.
+  tunnels: 26
+  tunnel-length: 160
+
+  # How far carving must stay clear of any wall.
+  wall-margin: 3
+
+  # Loot chests hidden in the caves.
+  chests: 6
 
 bases:
   pedestal-material: STONE_BRICKS
@@ -72,13 +73,61 @@ center:
   # walls.vault-radius.
   ring-radius: 3
 
-teams:
-  # Any count from 2 upwards. Four on a square is the classic cross; other
-  # counts get a circular arena with equal pie-slice sectors. Very high counts
-  # need a larger walls.vault-radius so the arms do not merge at the centre -
-  # the plugin says so at startup if the numbers do not work.
-  count: 4
-  min-players-per-team: 1
+# Named game modes. Switch with /walls mode <name>.
+#
+#   teams            any count from 2 up
+#   shape            SQUARE, CIRCLE, or auto (four teams square, others circle -
+#                    a square cannot be split into five equal sectors)
+#   radius           half-width; the map is (2 * radius + 1) blocks across
+#   players-per-team what the mode is sized for
+#   base-offset      distance from centre to each base; 0 works it out
+#   vault-radius     more teams need a bigger vault, or the walls merge at the
+#                    centre. The plugin says so at startup if they would.
+modes:
+  mega:
+    teams: 4
+    shape: SQUARE
+    radius: 100
+    players-per-team: 25
+    wall-height: 16
+    vault-radius: 8
+    grace-seconds: 300
+  large:
+    teams: 5
+    shape: CIRCLE
+    radius: 80
+    players-per-team: 12
+    wall-height: 15
+    vault-radius: 8
+    grace-seconds: 240
+  small:
+    teams: 4
+    shape: SQUARE
+    radius: 60
+    players-per-team: 6
+    wall-height: 14
+    vault-radius: 6
+    grace-seconds: 180
+  duel:
+    teams: 2
+    shape: CIRCLE
+    radius: 30
+    players-per-team: 1
+    wall-height: 12
+    vault-radius: 6
+    grace-seconds: 90
+
+default-mode: small
+
+# One arena per world. With a single arena the world keeps the plain name above;
+# with several, each gets the name suffixed (walls_arena_main, walls_arena_duel).
+arenas:
+  main:
+    mode: small
+
+stats:
+  # Per-player matches, wins, kills, deaths and wool broken, kept in stats.yml.
+  enabled: true
 
 objective:
   # The "1000 health" wool block each team must defend.
@@ -88,8 +137,7 @@ objective:
 
 game:
   countdown-seconds: 15
-  # How long teams have behind the walls before they fall.
-  grace-seconds: 180
+  # How long teams have behind the walls is set per mode, above.
   # Time spent as a spectator before respawning, while the team's wool stands.
   respawn-seconds: 5
   # How long the winner is shown before the arena rebuilds.

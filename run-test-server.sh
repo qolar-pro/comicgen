@@ -324,6 +324,15 @@ grep -qF 'Nobody is online to play' "$RUN_DIR/console.out" \
 step "/walls status (final)"
 console "walls status"; sleep 3
 
+step "Caves should have been carved into the stone"
+if sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" \
+     | grep -qE 'Caves: [1-9][0-9]{3,} carved'; then
+  echo "    ok    caves carved"
+  sed -e 's/\x1b\[[0-9;]*m//g' "$RUN_DIR/console.out" | grep 'Caves:' | tail -1 | sed 's/^/          /'
+else
+  die "no caves were carved into the platform"
+fi
+
 step "Stopping the server"
 console "stop"
 wait_for 'Stopping server' 60 || true

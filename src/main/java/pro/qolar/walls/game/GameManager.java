@@ -17,6 +17,7 @@ import org.bukkit.scheduler.BukkitTask;
 import org.bukkit.scoreboard.Criteria;
 import org.bukkit.scoreboard.DisplaySlot;
 import org.bukkit.scoreboard.Scoreboard;
+import pro.qolar.walls.ModeSettings;
 import pro.qolar.walls.WallsConfig;
 import pro.qolar.walls.WallsPlugin;
 import pro.qolar.walls.arena.Arena;
@@ -36,6 +37,7 @@ public final class GameManager {
     private final WallsPlugin plugin;
     private final WallsConfig config;
     private final Arena arena;
+    private final ModeSettings mode;
 
     private final List<GameTeam> teams = new ArrayList<>();
     private final Map<UUID, Integer> assignment = new HashMap<>();
@@ -49,10 +51,11 @@ public final class GameManager {
     private org.bukkit.scoreboard.Objective sidebar;
     private List<String> renderedLines = new ArrayList<>();
 
-    public GameManager(WallsPlugin plugin, WallsConfig config, Arena arena) {
+    public GameManager(WallsPlugin plugin, WallsConfig config, Arena arena, ModeSettings mode) {
         this.plugin = plugin;
         this.config = config;
         this.arena = arena;
+        this.mode = mode;
         TeamColor[] colors = TeamColor.values();
         for (int i = 0; i < arena.layout().size(); i++) {
             teams.add(new GameTeam(i, colors[i % colors.length], config.objectiveMaxHealth()));
@@ -69,6 +72,10 @@ public final class GameManager {
 
     public Arena arena() {
         return arena;
+    }
+
+    public ModeSettings mode() {
+        return mode;
     }
 
     public GameTeam teamOf(Player player) {
@@ -161,6 +168,12 @@ public final class GameManager {
             teams.forEach(GameTeam::clear);
             return "Need players on at least 2 teams to start (" + candidates.size()
                     + " player(s) online, " + populated + " team(s) filled).";
+        }
+
+        if (candidates.size() > mode.capacity()) {
+            Msg.broadcast("&e" + candidates.size() + " players on a '" + mode.name()
+                    + "' arena built for " + mode.capacity()
+                    + ". &7Consider a larger mode with /walls mode.");
         }
 
         setUpScoreboard();
@@ -297,7 +310,7 @@ public final class GameManager {
 
     private void beginGrace() {
         state = GameState.GRACE;
-        secondsLeft = config.graceSeconds();
+        secondsLeft = mode.graceSeconds();
         Msg.broadcast("&aGo! &7Gather and fortify - the walls fall in " + formatTime(secondsLeft) + ".");
         title("&a&lGO!", "&7Prepare your base");
     }
@@ -360,6 +373,7 @@ public final class GameManager {
                     + "&7/" + target.objective().maxHealth() + " HP");
         } else {
             arena.clearObjective(target.index());
+            plugin.stats().addWool(player);
             Msg.broadcast(target.color().colored() + "&c's wool has been destroyed! &7They can no longer respawn.");
             for (Player online : onlinePlayersInMatch()) {
                 online.playSound(online.getLocation(), Sound.ENTITY_WITHER_SPAWN, 0.6f, 1.2f);
@@ -390,6 +404,11 @@ public final class GameManager {
         if (team == null || !state.inProgress()) {
             return;
         }
+        plugin.stats().addDeath(player);
+        Player killer = player.getKiller();
+        if (killer != null && !killer.equals(player) && teamOf(killer) != null) {
+            plugin.stats().addKill(killer);
+        }
         if (team.canRespawn()) {
             Msg.broadcast(team.color().chatColor() + player.getName() + " &7died and will respawn.");
             return;
@@ -411,7 +430,7 @@ public final class GameManager {
             // Out of the match: stay to watch.
             Bukkit.getScheduler().runTask(plugin, () -> {
                 player.setGameMode(GameMode.SPECTATOR);
-                Msg.send(player, "&7You are out. Spectating until the match ends.");
+                Msg.send(player, "&7You are out. Use &f/walls watch&7 to follow the survivors.");
             });
             return spawn;
         }
@@ -454,7 +473,11 @@ public final class GameManager {
         }
         for (Player player : onlinePlayersInMatch()) {
             player.playSound(player.getLocation(), Sound.UI_TOAST_CHALLENGE_COMPLETE, 1f, 1f);
+            GameTeam theirs = teamOf(player);
+            plugin.stats().addMatch(player, winner != null && theirs != null
+                    && theirs.index() == winner.index());
         }
+        plugin.stats().save();
     }
 
     private void finishAndRebuild() {
@@ -503,7 +526,7 @@ public final class GameManager {
             }
             case GRACE -> {
                 text = ChatColor.YELLOW + "Walls fall in " + formatTime(secondsLeft);
-                progress = clamp((double) secondsLeft / Math.max(1, config.graceSeconds()));
+                progress = clamp((double) secondsLeft / Math.max(1, mode.graceSeconds()));
             }
             case OPEN -> {
                 long remaining = teams.stream().filter(t -> !t.isEliminated()).count();
@@ -587,6 +610,23 @@ public final class GameManager {
         return players;
     }
 
+    /** Players still in the fight, for the spectator menu to point at. */
+    public List<Player> survivors() {
+        List<Player> alive = new ArrayList<>();
+        for (GameTeam team : teams) {
+            if (team.isEliminated()) {
+                continue;
+            }
+            for (UUID id : team.members()) {
+                Player player = Bukkit.getPlayer(id);
+                if (player != null && player.isOnline() && !team.isDown(id)) {
+                    alive.add(player);
+                }
+            }
+        }
+        return alive;
+    }
+
     public static String formatTime(int seconds) {
         int safe = Math.max(0, seconds);
         return String.format("%d:%02d", safe / 60, safe % 60);
@@ -600,6 +640,8 @@ public final class GameManager {
         lines.add("&7Arena: &f" + (arena.isBuilt() ? "built" : "not built")
                 + "&7, walls &f" + (arena.wallsUp() ? "up" : "down")
                 + (arena.isBusy() ? " &e(working)" : ""));
+        lines.add("&7Caves: &f" + arena.caves().carvedCount() + "&7 carved, &f"
+                + arena.caves().oreCount() + "&7 ore, &f" + arena.caves().chestSpots().size() + "&7 chests");
         lines.add("&7Lobby: &f" + lobbySize() + " waiting");
         for (GameTeam team : teams) {
             lines.add("  " + team.color().colored() + "&7: &f" + team.size() + " players&7, wool &f"

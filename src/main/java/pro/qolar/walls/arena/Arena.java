@@ -31,23 +31,31 @@ public final class Arena {
 
     private final Plugin plugin;
     private final WallsConfig config;
+    private final String worldName;
     private final ArenaGeometry geo;
     private final SectorLayout layout;
     private final ColumnMap columns;
     private final Random random = new Random();
 
     private World world;
+    private CaveField caves = CaveField.none();
     private ArenaBuilder builder;
     private BukkitTask wallTask;
     private boolean wallsUp;
     private boolean built;
 
-    public Arena(Plugin plugin, WallsConfig config, SectorLayout layout) {
+    public Arena(Plugin plugin, WallsConfig config, String worldName,
+                 ArenaGeometry geometry, SectorLayout layout) {
         this.plugin = plugin;
         this.config = config;
-        this.geo = config.geometry();
+        this.worldName = worldName;
+        this.geo = geometry;
         this.layout = layout;
-        this.columns = ColumnMap.of(geo);
+        this.columns = ColumnMap.of(geometry);
+    }
+
+    public String worldName() {
+        return worldName;
     }
 
     // --- world -----------------------------------------------------------
@@ -57,13 +65,13 @@ public final class Arena {
         if (world != null) {
             return world;
         }
-        World existing = plugin.getServer().getWorld(config.worldName());
+        World existing = plugin.getServer().getWorld(worldName);
         world = existing != null ? existing
-                : new WorldCreator(config.worldName())
+                : new WorldCreator(worldName)
                         .generator(new VoidChunkGenerator())
                         .createWorld();
         if (world == null) {
-            throw new IllegalStateException("could not create arena world '" + config.worldName() + "'");
+            throw new IllegalStateException("could not create arena world '" + worldName + "'");
         }
         applyWorldRules(world);
         return world;
@@ -218,18 +226,34 @@ public final class Arena {
             throw new IllegalStateException("the arena is already being built");
         }
         clearLooseEntities();
+        caves = generateCaves();
 
         feedback.accept("Building arena (this takes a moment)...");
         builder = new BukkitBatchBuilder(plugin, world, config.blocksPerTick());
         builder.fill(fullVolume(), placed -> {
             placeBases();
             placeChests();
+            placeCaveChests();
             wallsUp = true;
             built = true;
             builder = null;
             feedback.accept("Arena ready - " + placed + " blocks placed, walls up.");
             onDone.run();
         });
+    }
+
+    private CaveField generateCaves() {
+        if (!config.cavesEnabled()) {
+            return CaveField.none();
+        }
+        long seed = config.caveSeed() != 0L ? config.caveSeed() : random.nextLong();
+        return CaveField.generate(geo, columns, seed, config.caveWorms(),
+                config.caveWormLength(), config.caveWallMargin(), config.caveChests());
+    }
+
+    /** The caves worked into this build of the arena. */
+    public CaveField caves() {
+        return caves;
     }
 
     private void clearLooseEntities() {
@@ -307,7 +331,11 @@ public final class Arena {
             case PLATFORM:
             default:
                 if (y <= geo.floorY()) {
-                    return layerMaterial(geo.layerAtY(y));
+                    if (caves.isCarved(dx, y, dz)) {
+                        return Material.AIR;
+                    }
+                    CaveField.Ore ore = caves.oreAt(dx, y, dz);
+                    return ore != null ? oreMaterial(ore) : layerMaterial(geo.layerAtY(y));
                 }
                 // Above the floor: air, so a reset wipes player builds.
                 return y < geo.ceilingY() ? Material.AIR : config.glassMaterial();
@@ -321,6 +349,30 @@ public final class Arena {
             case STONE -> Material.STONE;
             case BEDROCK -> Material.BEDROCK;
         };
+    }
+
+    private Material oreMaterial(CaveField.Ore ore) {
+        return switch (ore) {
+            case COAL -> Material.COAL_ORE;
+            case COPPER -> Material.COPPER_ORE;
+            case IRON -> Material.IRON_ORE;
+            case LAPIS -> Material.LAPIS_ORE;
+            case GOLD -> Material.GOLD_ORE;
+            case REDSTONE -> Material.REDSTONE_ORE;
+            case DIAMOND -> Material.DIAMOND_ORE;
+            case EMERALD -> Material.EMERALD_ORE;
+        };
+    }
+
+    private void placeCaveChests() {
+        for (int[] spot : caves.chestSpots()) {
+            Block block = world.getBlockAt(worldX(spot[0]), spot[1], worldZ(spot[2]));
+            block.setType(Material.CHEST, false);
+            BlockState state = block.getState();
+            if (state instanceof Chest chest) {
+                LootTable.fill(chest.getBlockInventory(), random, 3 + random.nextInt(4));
+            }
+        }
     }
 
     private void placeBases() {

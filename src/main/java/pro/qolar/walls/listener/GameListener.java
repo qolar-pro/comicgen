@@ -1,5 +1,6 @@
 package pro.qolar.walls.listener;
 
+import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.entity.Projectile;
 import org.bukkit.event.EventHandler;
@@ -13,28 +14,41 @@ import org.bukkit.event.entity.PlayerDeathEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.player.PlayerRespawnEvent;
 import org.bukkit.projectiles.ProjectileSource;
+import pro.qolar.walls.ArenaInstance;
+import pro.qolar.walls.ArenaRegistry;
 import pro.qolar.walls.arena.Arena;
 import pro.qolar.walls.game.GameManager;
 import pro.qolar.walls.game.GameState;
 import pro.qolar.walls.game.GameTeam;
 import pro.qolar.walls.util.Msg;
 
-/** Wires world and player events into the match. */
+/**
+ * Wires world and player events into the right match.
+ *
+ * <p>Every arena owns its world, so the world an event happened in decides which
+ * match it belongs to. Events from anywhere else are none of this plugin's
+ * business and are left alone.
+ */
 public final class GameListener implements Listener {
 
-    private final GameManager game;
-    private final Arena arena;
+    private final ArenaRegistry arenas;
 
-    public GameListener(GameManager game) {
-        this.game = game;
-        this.arena = game.arena();
+    public GameListener(ArenaRegistry arenas) {
+        this.arenas = arenas;
+    }
+
+    private ArenaInstance instanceAt(World world) {
+        return world == null ? null : arenas.byWorld(world.getName());
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBreak(BlockBreakEvent event) {
-        if (!inArenaWorld(event.getBlock().getWorld().getName())) {
+        ArenaInstance instance = instanceAt(event.getBlock().getWorld());
+        if (instance == null) {
             return;
         }
+        GameManager game = instance.game();
+        Arena arena = instance.arena();
         Player player = event.getPlayer();
 
         // Objectives are never really broken - they are chipped.
@@ -55,12 +69,14 @@ public final class GameListener implements Listener {
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlace(BlockPlaceEvent event) {
-        if (!inArenaWorld(event.getBlock().getWorld().getName())) {
+        ArenaInstance instance = instanceAt(event.getBlock().getWorld());
+        if (instance == null) {
             return;
         }
+        GameManager game = instance.game();
         Player player = event.getPlayer();
 
-        if (arena.isProtected(event.getBlock())) {
+        if (instance.arena().isProtected(event.getBlock())) {
             event.setCancelled(true);
             Msg.send(player, "&cYou cannot build there.");
             return;
@@ -73,7 +89,7 @@ public final class GameListener implements Listener {
         // While the walls stand, nobody towers over them. The ceiling sits well
         // below the wall top: building level with it would let a player step
         // straight onto the wall and walk into the next sector.
-        int ceiling = arena.geometry().graceBuildCeilingY();
+        int ceiling = instance.arena().geometry().graceBuildCeilingY();
         if (game.state() == GameState.GRACE && event.getBlock().getY() > ceiling) {
             event.setCancelled(true);
             Msg.send(player, "&cYou cannot build that high before the walls fall.");
@@ -83,10 +99,11 @@ public final class GameListener implements Listener {
     /** TNT is in the loot table, so explosions must respect the arena shell. */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onExplode(EntityExplodeEvent event) {
-        if (!inArenaWorld(event.getLocation().getWorld().getName())) {
+        ArenaInstance instance = instanceAt(event.getLocation().getWorld());
+        if (instance == null) {
             return;
         }
-        event.blockList().removeIf(arena::isProtected);
+        event.blockList().removeIf(instance.arena()::isProtected);
     }
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
@@ -94,10 +111,15 @@ public final class GameListener implements Listener {
         if (!(event.getEntity() instanceof Player victim)) {
             return;
         }
+        ArenaInstance instance = instanceAt(victim.getWorld());
+        if (instance == null) {
+            return;
+        }
         Player attacker = resolveAttacker(event);
         if (attacker == null) {
             return;
         }
+        GameManager game = instance.game();
         GameTeam victimTeam = game.teamOf(victim);
         GameTeam attackerTeam = game.teamOf(attacker);
         if (victimTeam == null || attackerTeam == null) {
@@ -129,27 +151,29 @@ public final class GameListener implements Listener {
 
     @EventHandler
     public void onDeath(PlayerDeathEvent event) {
-        if (game.teamOf(event.getEntity()) == null) {
+        ArenaInstance instance = instanceAt(event.getEntity().getWorld());
+        if (instance == null || instance.game().teamOf(event.getEntity()) == null) {
             return;
         }
         event.setDeathMessage(null);
-        game.handleDeath(event.getEntity());
+        instance.game().handleDeath(event.getEntity());
     }
 
     @EventHandler
     public void onRespawn(PlayerRespawnEvent event) {
-        if (game.teamOf(event.getPlayer()) == null) {
-            return;
+        for (ArenaInstance instance : arenas.all()) {
+            if (instance.game().teamOf(event.getPlayer()) != null) {
+                event.setRespawnLocation(instance.game().handleRespawn(event.getPlayer()));
+                return;
+            }
         }
-        event.setRespawnLocation(game.handleRespawn(event.getPlayer()));
     }
 
     @EventHandler
     public void onQuit(PlayerQuitEvent event) {
-        game.leave(event.getPlayer());
-    }
-
-    private boolean inArenaWorld(String worldName) {
-        return arena.world() != null && arena.world().getName().equals(worldName);
+        // A player may be in any arena's lobby or match; ask each.
+        for (ArenaInstance instance : arenas.all()) {
+            instance.game().leave(event.getPlayer());
+        }
     }
 }
